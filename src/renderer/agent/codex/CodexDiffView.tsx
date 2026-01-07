@@ -289,7 +289,7 @@ export default function CodexDiffView({ diff }: { diff: string }) {
                 title={f.path}
               >
                 <div className="truncate text-[11px]">{f.path}</div>
-                <div className={["text-[10px]", active ? "text-white/80" : "text-[var(--vscode-descriptionForeground)]"].join(" ")}>
+                <div className={["text-[10px]", active ? "text-[var(--vscode-list-activeSelectionForeground)]" : "text-[var(--vscode-descriptionForeground)]"].join(" ")}>
                   {formatCounts(f.added, f.removed) || "no changes"}
                 </div>
               </button>
