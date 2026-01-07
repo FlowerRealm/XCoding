@@ -1266,6 +1266,7 @@ export default function App() {
   useEffect(() => {
     void window.xcoding.settings.get().then((s) => {
       setLanguage(s.ui.language);
+      setTheme(s.ui.theme);
       setAutoApplyAll(s.ai.autoApplyAll);
       setAiConfig({ apiBase: s.ai.apiBase, apiKey: s.ai.apiKey, model: s.ai.model });
       if (s.ui.layout) {
