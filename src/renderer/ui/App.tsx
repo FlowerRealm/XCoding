@@ -1584,6 +1584,18 @@ export default function App() {
             viewMode={activeViewMode ?? undefined}
             onViewModeChange={activeProjectId && activeViewMode ? ((mode) => void setProjectViewMode(mode)) : undefined}
             showExplorerToggle={!isWorkflowPreview}
+            activeProjectSlot={activeProjectSlot}
+            projectSlots={visibleProjectSlotsForWindow.map((p) => ({
+              slot: p.slot,
+              project: p.project ? { name: p.project.name, path: p.project.path } : undefined,
+              aiStatus: aiBySlot[p.slot]
+            }))}
+            onSelectProjectSlot={(slot) => {
+              if (isSingleProjectWindow && slot !== lockedProjectSlotRef.current) return;
+              setActiveProjectSlot(slot);
+              void window.xcoding.projects.setActiveSlot(slot);
+            }}
+            onOpenProjectPicker={() => setIsProjectPickerOpen(true)}
             language={language}
             onSetLanguage={(next) => void setLanguageAndPersist(next)}
           />
