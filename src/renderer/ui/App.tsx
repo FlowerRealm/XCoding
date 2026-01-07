@@ -1851,7 +1851,6 @@ export default function App() {
           />
           </>
           )}
-        </div>
 
 	        <IdeaFlowModal
 	          isOpen={Boolean(!isProjectPickerOpen && activeProjectId && activeWorkflowStage === "idea")}

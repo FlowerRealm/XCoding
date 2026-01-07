@@ -1,7 +1,8 @@
 import { DiffEditor } from "@monaco-editor/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ensureMonacoLanguage, monaco, MONACO_THEME_NAME, MONACO_URI_SCHEME } from "../monacoSetup";
+import { ensureMonacoLanguage, getMonacoThemeName, monaco, MONACO_URI_SCHEME } from "../monacoSetup";
 import { useI18n } from "./i18n";
+import { useUiTheme } from "./UiThemeContext";
 
 function guessLanguageIdFromPath(relPath: string) {
   const p = String(relPath ?? "").toLowerCase();
@@ -20,6 +21,7 @@ function guessLanguageIdFromPath(relPath: string) {
 
 export default function GitDiffView({ slot, path, mode }: { slot: number; path: string; mode: "working" | "staged" }) {
   const { t } = useI18n();
+  const { theme } = useUiTheme();
   const [state, setState] = useState<{ loading: boolean; error?: string; original: string; modified: string; truncated: boolean; isBinary: boolean }>({
     loading: true,
     original: "",
@@ -91,7 +93,7 @@ export default function GitDiffView({ slot, path, mode }: { slot: number; path: 
       {header}
       <div className="relative min-h-0 flex-1">
         <DiffEditor
-          theme={MONACO_THEME_NAME}
+          theme={getMonacoThemeName(theme)}
           original={state.original ?? ""}
           modified={state.modified ?? ""}
           language={language}
