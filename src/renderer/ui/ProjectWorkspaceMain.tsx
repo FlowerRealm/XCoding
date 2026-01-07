@@ -68,7 +68,7 @@ export default function ProjectWorkspaceMain(props: Props) {
   } = props;
 
   return (
-    <main className="min-w-0 flex-1 bg-[var(--vscode-editor-background)]">
+    <main className="flex min-w-0 flex-1 flex-col bg-transparent">
       {!isActiveSlotBound ? (
         <WelcomeView
           recentProjects={recentProjects}
@@ -77,7 +77,7 @@ export default function ProjectWorkspaceMain(props: Props) {
         />
       ) : (
         <div className="flex h-full min-h-0 flex-col">
-          <div className="min-h-0 flex-1 p-3">
+          <div className="min-h-0 flex-1">
             <LayoutManager
               mode={activeUi.layoutMode}
               split={activeUi.layoutSplit}
@@ -294,10 +294,10 @@ export default function ProjectWorkspaceMain(props: Props) {
                 if (tab.type === "preview") {
                   const mode = activeUi.previewUi?.mode ?? "standard";
                   return (
-                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded border border-[var(--vscode-panel-border)]">
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--vscode-editor-background)]">
                       <div className="flex items-center gap-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-2">
                         <input
-                          className="min-w-0 flex-1 rounded bg-[var(--vscode-input-background)] px-2 py-1 text-xs text-[var(--vscode-input-foreground)] outline-none ring-1 ring-[var(--vscode-input-border)] focus:ring-[var(--vscode-focusBorder)]"
+                          className="min-w-0 flex-1 rounded-sm bg-[var(--vscode-input-background)] px-2 py-1 text-xs text-[var(--vscode-input-foreground)] outline-none ring-1 ring-[var(--vscode-input-border)] focus:ring-[var(--vscode-focusBorder)]"
                           value={tab.url}
                           onChange={(e) => {
                             const nextUrl = e.target.value;
