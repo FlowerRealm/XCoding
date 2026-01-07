@@ -8,8 +8,9 @@
   "scripts": {
     "prebuild": "pnpm run setup:codex",
     "preinstall": "node scripts/ensure-pnpm.cjs",
-    "postinstall": "node scripts/fix-node-pty-perms.cjs",
+    "postinstall": "node scripts/fix-node-pty-perms.cjs && node scripts/fetch-firacode-nerd-font.cjs",
     "setup:codex": "node scripts/fetch-codex-binary.cjs",
+    "setup:fonts": "node scripts/fetch-firacode-nerd-font.cjs",
     "dev": "concurrently -k \"vite\" \"pnpm run main:watch\" \"wait-on http://127.0.0.1:5173 file:dist/main/main.cjs && pnpm run electron:dev\"",
     "main:watch": "tsup --config tsup.config.ts --watch --onSuccess \"node scripts/copy-preload.cjs\"",
     "electron:dev": "node scripts/electron-dev.cjs .",
