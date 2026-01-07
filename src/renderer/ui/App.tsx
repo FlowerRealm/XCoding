@@ -3,6 +3,7 @@ import ExplorerPanel from "./ExplorerPanel";
 import GitPanel from "./GitPanel";
 import AutoWorkspace from "./AutoWorkspace";
 import { I18nContext, type Language, messages } from "./i18n";
+import { UiThemeContext, type UiTheme } from "./UiThemeContext";
 import IdeaFlowModal from "./IdeaFlowModal";
 import IdeaWorkspace from "./IdeaWorkspace";
 import type { LayoutMode, PaneId, SplitIntent } from "./LayoutManager";
@@ -10,6 +11,7 @@ import NewProjectWizardModal from "./NewProjectWizardModal";
 import ProjectChatPanel from "./ProjectChatPanel";
 import ProjectSidebar from "./ProjectSidebar";
 import ProjectWorkspaceMain from "./ProjectWorkspaceMain";
+import IdeSettingsModal from "./IdeSettingsModal";
 import type { TerminalPanelState } from "./TerminalPanel";
 import TitleBar from "./TitleBar";
 import {
@@ -44,6 +46,7 @@ function normalizeRelPath(input: string) {
 
 export default function App() {
   const [language, setLanguage] = useState<Language>("en-US");
+  const [theme, setTheme] = useState<UiTheme>("dark");
   const [activeProjectSlot, setActiveProjectSlot] = useState<number>(() => {
     try {
       const url = new URL(window.location.href);
@@ -96,6 +99,15 @@ export default function App() {
     }
   }
 
+  async function setThemeAndPersist(next: UiTheme) {
+    setTheme(next);
+    try {
+      await window.xcoding.settings.setTheme(next);
+    } catch {
+      // ignore
+    }
+  }
+
   function setAiConfigAndPersist(next: { apiBase: string; apiKey: string; model: string }) {
     setAiConfig(next);
     void window.xcoding.settings.setAiConfig(next);
@@ -122,6 +134,7 @@ export default function App() {
     return Object.fromEntries(entries) as Record<number, SlotUiState>;
   });
 
+  const [isIdeSettingsOpen, setIsIdeSettingsOpen] = useState(false);
   const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
   const [dragPreviewSlotOrder, setDragPreviewSlotOrder] = useState<number[] | null>(null);
   const [isDraggingTab, setIsDraggingTab] = useState(false);
@@ -145,6 +158,13 @@ export default function App() {
   useEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.body.classList.remove("light", "dark");
+    document.body.classList.add(theme);
+  }, [theme]);
 
   useEffect(() => {
     document.body.classList.toggle("xcoding-tab-dragging", isDraggingTab);
@@ -188,6 +208,12 @@ export default function App() {
       if ((e as any).isComposing) return;
       const key = e.key.toLowerCase();
       const isMod = e.metaKey || e.ctrlKey;
+
+      if (isMod && !e.altKey && !e.shiftKey && key === ",") {
+        e.preventDefault();
+        setIsIdeSettingsOpen((v) => !v);
+        return;
+      }
 
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase() ?? "";
@@ -1537,26 +1563,47 @@ export default function App() {
 
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>
-      <div className="h-full w-full bg-[var(--vscode-editor-background)] text-[var(--vscode-foreground)]">
-        <TitleBar
-          isExplorerVisible={effectiveLayout.isExplorerVisible}
-          isChatVisible={effectiveLayout.isChatVisible}
-          isTerminalVisible={Boolean(activeUi.terminalPanel?.isVisible && (activeUi.terminalPanel?.terminals?.length ?? 0) > 0)}
-          onToggleExplorer={() => setLayoutAndPersist((p) => ({ ...p, isExplorerVisible: !p.isExplorerVisible }))}
-          onToggleChat={() => setLayoutAndPersist((p) => ({ ...p, isChatVisible: !p.isChatVisible }))}
-          onToggleTerminal={() => toggleOrCreateTerminalPanel()}
-          centerTitle={activeProject?.name ?? ""}
-          viewMode={activeViewMode ?? undefined}
-          onViewModeChange={activeProjectId && activeViewMode ? ((mode) => void setProjectViewMode(mode)) : undefined}
-          showExplorerToggle={!isWorkflowPreview}
-          language={language}
-          onSetLanguage={(next) => void setLanguageAndPersist(next)}
-        />
+      <UiThemeContext.Provider value={{ theme }}>
+        <div
+          className={[
+            "flex h-full w-full flex-col bg-aurora-base text-[var(--vscode-foreground)]",
+            theme === "light" ? "light" : ""
+          ].join(" ")}
+          style={{ backgroundImage: "var(--aurora-bg)" }}
+        >
+          <TitleBar
+            isExplorerVisible={effectiveLayout.isExplorerVisible}
+            isChatVisible={effectiveLayout.isChatVisible}
+            isTerminalVisible={Boolean(activeUi.terminalPanel?.isVisible && (activeUi.terminalPanel?.terminals?.length ?? 0) > 0)}
+            onToggleExplorer={() => setLayoutAndPersist((p) => ({ ...p, isExplorerVisible: !p.isExplorerVisible }))}
+            onToggleChat={() => setLayoutAndPersist((p) => ({ ...p, isChatVisible: !p.isChatVisible }))}
+            onToggleTerminal={() => toggleOrCreateTerminalPanel()}
+            onOpenSettings={() => setIsIdeSettingsOpen(true)}
+            centerTitle={activeProject?.name ?? ""}
+            viewMode={activeViewMode ?? undefined}
+            onViewModeChange={activeProjectId && activeViewMode ? ((mode) => void setProjectViewMode(mode)) : undefined}
+            showExplorerToggle={!isWorkflowPreview}
+            language={language}
+            onSetLanguage={(next) => void setLanguageAndPersist(next)}
+          />
 
-        <div className="flex h-[calc(100%-2.5rem)] min-h-0 w-full">
-          {/* Idea/Auto stages: minimal workspace (doc/chat) */}
-          {activeProjectId && (activeWorkflowStage === "idea" || activeWorkflowStage === "auto") ? (
-            <div className="flex min-h-0 flex-1">
+          <IdeSettingsModal
+            isOpen={isIdeSettingsOpen}
+            onClose={() => setIsIdeSettingsOpen(false)}
+            language={language}
+            onSetLanguage={(next) => void setLanguageAndPersist(next)}
+            theme={theme}
+            onSetTheme={(next) => void setThemeAndPersist(next)}
+            isExplorerVisible={layout.isExplorerVisible}
+            isChatVisible={layout.isChatVisible}
+            onToggleExplorer={() => setLayoutAndPersist((p) => ({ ...p, isExplorerVisible: !p.isExplorerVisible }))}
+            onToggleChat={() => setLayoutAndPersist((p) => ({ ...p, isChatVisible: !p.isChatVisible }))}
+          />
+
+          <div className="flex min-h-0 w-full flex-1 overflow-hidden">
+            {/* Idea/Auto stages: minimal workspace (doc/chat) */}
+            {activeProjectId && (activeWorkflowStage === "idea" || activeWorkflowStage === "auto") ? (
+            <div className="flex min-h-0 flex-1 bg-editor-bg">
               <div className="min-h-0 flex-1">
                 {activeWorkflowStage === "idea" ? (
                   <div className="flex h-full w-full items-center justify-center p-10 text-sm text-[var(--vscode-descriptionForeground)]">
@@ -1851,7 +1898,9 @@ export default function App() {
 	            />
 	          }
 	        />
-      </div>
+          </div>
+        </div>
+      </UiThemeContext.Provider>
     </I18nContext.Provider>
   );
 }
