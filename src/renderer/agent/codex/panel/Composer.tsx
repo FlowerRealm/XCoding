@@ -276,6 +276,16 @@ export default function Composer({
 
   const [openPicker, setOpenPicker] = useState<null | "mode" | "model" | "effort">(null);
 
+  useEffect(() => {
+    const onDismissOverlays = () => {
+      setOpenPicker(null);
+      setIsPlusMenuOpen(false);
+      setIsSlashMenuOpen(false);
+    };
+    window.addEventListener("xcoding:dismissOverlays", onDismissOverlays as any);
+    return () => window.removeEventListener("xcoding:dismissOverlays", onDismissOverlays as any);
+  }, [setIsPlusMenuOpen, setIsSlashMenuOpen]);
+
   const DropdownSelect = ({
     id,
     value,

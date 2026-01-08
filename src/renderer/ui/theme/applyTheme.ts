@@ -33,14 +33,13 @@ export function applyResolvedThemePack(theme: ResolvedThemePack) {
   if (theme.monacoThemeData) {
     try {
       monaco.editor.defineTheme(theme.monacoThemeName, theme.monacoThemeData as any);
-    } catch {
-      // ignore
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn("monaco.defineTheme failed", e);
     }
   }
   try {
     monaco.editor.setTheme(theme.monacoThemeName);
-  } catch {
-    // ignore
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn("monaco.setTheme failed", e);
   }
 }
-
