@@ -1,4 +1,4 @@
-import { type DragEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ExplorerPanel from "./ExplorerPanel";
 import AutoWorkspace from "./AutoWorkspace";
 import { I18nContext, type Language, messages } from "./i18n";
@@ -10,11 +10,13 @@ import NewProjectWizardModal from "./NewProjectWizardModal";
 import ProjectChatPanel from "./ProjectChatPanel";
 import ProjectSidebar from "./ProjectSidebar";
 import ProjectWorkspaceMain from "./ProjectWorkspaceMain";
+import AlertModal from "./AlertModal";
 import IdeSettingsModal from "./IdeSettingsModal";
 import type { TerminalPanelState } from "./TerminalPanel";
 import TitleBar from "./TitleBar";
+import { getMonacoThemeName } from "../monacoSetup";
 import { applyResolvedThemePack } from "./theme/applyTheme";
-import type { ThemePackSummary } from "./theme/types";
+import type { ResolvedThemePack, ThemePackSummary } from "./theme/types";
 import {
   getSlotProjectId,
   makeEmptySlotUiState,
@@ -41,12 +43,30 @@ function isMarkdownFilePath(relPath: string) {
   return lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".mdx");
 }
 
+function makeBuiltinResolvedThemePack(appearance: UiTheme): ResolvedThemePack {
+  const id = appearance === "light" ? "builtin-light" : "builtin-dark";
+  return {
+    id,
+    name: id,
+    appearance,
+    cssVars: {},
+    monacoThemeName: getMonacoThemeName(appearance),
+    extraCssText: ""
+  };
+}
+
 export default function App() {
   const [language, setLanguage] = useState<Language>("en-US");
   const [theme, setTheme] = useState<UiTheme>("dark");
   const [themePackId, setThemePackId] = useState("builtin-dark");
   const [themePacks, setThemePacks] = useState<ThemePackSummary[]>([]);
   const [monacoThemeName, setMonacoThemeName] = useState("xcoding-dark");
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const themeApplySeqRef = useRef(0);
+  const themePackIdRef = useRef(themePackId);
+  const lastSuccessfulResolvedThemePackRef = useRef<ResolvedThemePack>(makeBuiltinResolvedThemePack("dark"));
+  const themePackPersistTimerRef = useRef<number | null>(null);
+  const pendingThemePackPersistIdRef = useRef<string | null>(null);
   const [activeProjectSlot, setActiveProjectSlot] = useState<number>(() => {
     try {
       const url = new URL(window.location.href);
@@ -90,6 +110,42 @@ export default function App() {
     model: "gpt-4o-mini"
   });
 
+  useEffect(() => {
+    themePackIdRef.current = themePackId;
+  }, [themePackId]);
+
+  useEffect(() => {
+    return () => {
+      if (themePackPersistTimerRef.current != null) window.clearTimeout(themePackPersistTimerRef.current);
+    };
+  }, []);
+
+  function schedulePersistThemePackId(id: string) {
+    pendingThemePackPersistIdRef.current = id;
+    if (themePackPersistTimerRef.current != null) window.clearTimeout(themePackPersistTimerRef.current);
+    themePackPersistTimerRef.current = window.setTimeout(() => {
+      themePackPersistTimerRef.current = null;
+      const nextId = pendingThemePackPersistIdRef.current;
+      if (!nextId) return;
+      void window.xcoding.settings.setThemePack(nextId).catch((e) => {
+        if (import.meta.env.DEV) console.warn("settings.setThemePack failed", e);
+      });
+    }, 150);
+  }
+
+  const applyResolvedThemeToState = useCallback((resolved: ResolvedThemePack) => {
+    applyResolvedThemePack(resolved);
+    setTheme(resolved.appearance);
+    setMonacoThemeName(resolved.monacoThemeName);
+    setThemePackId(resolved.id);
+    themePackIdRef.current = resolved.id;
+    lastSuccessfulResolvedThemePackRef.current = resolved;
+  }, []);
+
+  function showAlert(message: string) {
+    setAlertMessage(message);
+  }
+
   async function setLanguageAndPersist(next: Language) {
     setLanguage(next);
     try {
@@ -100,20 +156,22 @@ export default function App() {
   }
 
   async function setThemePackAndPersist(nextId: string) {
+    const requestedId = String(nextId ?? "").trim();
+    if (!requestedId) return;
+
+    const applySeq = ++themeApplySeqRef.current;
+
     try {
-      const resolved = await window.xcoding.themes.getResolved(nextId);
-      applyResolvedThemePack(resolved);
-      setTheme(resolved.appearance);
-      setMonacoThemeName(resolved.monacoThemeName);
-      setThemePackId(resolved.id);
-    } catch {
-      // ignore
-      setThemePackId(nextId);
-    }
-    try {
-      await window.xcoding.settings.setThemePack(nextId);
-    } catch {
-      // ignore
+      const resolved = await window.xcoding.themes.getResolved(requestedId);
+      if (applySeq !== themeApplySeqRef.current) return;
+
+      applyResolvedThemeToState(resolved);
+      schedulePersistThemePackId(resolved.id);
+    } catch (e) {
+      if (applySeq !== themeApplySeqRef.current) return;
+      if (import.meta.env.DEV) console.warn("themes.getResolved failed", e);
+      applyResolvedThemeToState(lastSuccessfulResolvedThemePackRef.current);
+      showAlert(t("themePackApplyFailed"));
     }
   }
 
@@ -129,21 +187,22 @@ export default function App() {
     try {
       const res = await window.xcoding.themes.importZip();
       if (res.ok) {
-        if ("canceled" in res && res.canceled) return;
+        if ("canceled" in res) return;
 
-        if ("themeId" in res && typeof res.themeId === "string") {
-          const packs = await window.xcoding.themes.list();
-          setThemePacks(packs);
+        const packs = await window.xcoding.themes.list();
+        setThemePacks(packs);
 
-          const importedId = res.themeId;
-          if (importedId === themePackId) {
-            await setThemePackAndPersist(importedId);
-            return;
-          }
-
-          const shouldSwitch = window.confirm(`${t("importThemePackSwitchConfirm")}\n\n${importedId}`);
-          if (shouldSwitch) await setThemePackAndPersist(importedId);
+        const importedId = res.themeId;
+        if (importedId === themePackIdRef.current) {
+          await setThemePackAndPersist(importedId);
+          return;
         }
+
+        const importedName = packs.find((p) => p.id === importedId)?.name || importedId;
+        const displayName = importedName === importedId ? importedId : `${importedName} (${importedId})`;
+        const replacedHint = res.didReplace ? `\n\n${t("importThemePackDidReplace")}` : "";
+        const shouldSwitch = window.confirm(`${t("importThemePackSwitchConfirm")}${replacedHint}\n\n${displayName}`);
+        if (shouldSwitch) await setThemePackAndPersist(importedId);
         return;
       }
 
@@ -255,6 +314,7 @@ export default function App() {
 
       if (isMod && !e.altKey && !e.shiftKey && key === ",") {
         e.preventDefault();
+        window.dispatchEvent(new CustomEvent("xcoding:dismissOverlays"));
         setIsIdeSettingsOpen((v) => !v);
         return;
       }
@@ -1249,43 +1309,53 @@ export default function App() {
     let cancelled = false;
 
     void (async () => {
+      const applySeq = ++themeApplySeqRef.current;
+
+      let s: Awaited<ReturnType<typeof window.xcoding.settings.get>> | null = null;
       try {
-        const s = await window.xcoding.settings.get();
-        if (cancelled) return;
-        setLanguage(s.ui.language);
-        setAutoApplyAll(s.ai.autoApplyAll);
-        setAiConfig({ apiBase: s.ai.apiBase, apiKey: s.ai.apiKey, model: s.ai.model });
-        if (s.ui.layout) {
-          defaultUiLayoutRef.current = s.ui.layout;
-          setLayout(s.ui.layout);
-        }
+        s = await window.xcoding.settings.get();
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("settings.get failed", e);
+      }
+      if (!s || cancelled || applySeq !== themeApplySeqRef.current) return;
 
-        const initialThemePackId =
-          typeof s.ui.themePackId === "string" && s.ui.themePackId.trim()
-            ? s.ui.themePackId.trim()
-            : s.ui.theme === "light"
-              ? "builtin-light"
-              : "builtin-dark";
-        setThemePackId(initialThemePackId);
+      setLanguage(s.ui.language);
+      setAutoApplyAll(s.ai.autoApplyAll);
+      setAiConfig({ apiBase: s.ai.apiBase, apiKey: s.ai.apiKey, model: s.ai.model });
+      if (s.ui.layout) {
+        defaultUiLayoutRef.current = s.ui.layout;
+        setLayout(s.ui.layout);
+      }
 
-        const packs = await window.xcoding.themes.list();
-        if (cancelled) return;
-        setThemePacks(packs);
+      const fallbackTheme: UiTheme = s.ui.theme === "light" ? "light" : "dark";
+      const fallbackId = fallbackTheme === "light" ? "builtin-light" : "builtin-dark";
+      const requestedId =
+        typeof s.ui.themePackId === "string" && s.ui.themePackId.trim() ? s.ui.themePackId.trim() : fallbackId;
 
-        const isAvailable = packs.some((p) => p.id === initialThemePackId);
-        const effectiveId = isAvailable ? initialThemePackId : s.ui.theme === "light" ? "builtin-light" : "builtin-dark";
-        if (!isAvailable) {
-          setThemePackId(effectiveId);
-          void window.xcoding.settings.setThemePack(effectiveId);
-        }
+      let packs: ThemePackSummary[] = [];
+      try {
+        packs = await window.xcoding.themes.list();
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("themes.list failed", e);
+      }
+      if (cancelled || applySeq !== themeApplySeqRef.current) return;
+      if (packs.length) setThemePacks(packs);
 
+      const isAvailable = packs.length ? packs.some((p) => p.id === requestedId) : true;
+      const effectiveId = isAvailable ? requestedId : fallbackId;
+      setThemePackId(effectiveId);
+
+      try {
         const resolved = await window.xcoding.themes.getResolved(effectiveId);
-        if (cancelled) return;
-        applyResolvedThemePack(resolved);
-        setTheme(resolved.appearance);
-        setMonacoThemeName(resolved.monacoThemeName);
-      } catch {
-        // ignore
+        if (cancelled || applySeq !== themeApplySeqRef.current) return;
+        applyResolvedThemeToState(resolved);
+        if (resolved.id !== requestedId) schedulePersistThemePackId(resolved.id);
+      } catch (e) {
+        if (cancelled || applySeq !== themeApplySeqRef.current) return;
+        if (import.meta.env.DEV) console.warn("themes.getResolved failed", e);
+        showAlert(t("themePackLoadFailedFallback"));
+        applyResolvedThemeToState(makeBuiltinResolvedThemePack(fallbackTheme));
+        if (fallbackId !== requestedId) schedulePersistThemePackId(fallbackId);
       }
     })();
 
@@ -1602,7 +1672,10 @@ export default function App() {
             onToggleExplorer={() => setLayoutAndPersist((p) => ({ ...p, isExplorerVisible: !p.isExplorerVisible }))}
             onToggleChat={() => setLayoutAndPersist((p) => ({ ...p, isChatVisible: !p.isChatVisible }))}
             onToggleTerminal={() => toggleOrCreateTerminalPanel()}
-            onOpenSettings={() => setIsIdeSettingsOpen(true)}
+            onOpenSettings={() => {
+              window.dispatchEvent(new CustomEvent("xcoding:dismissOverlays"));
+              setIsIdeSettingsOpen(true);
+            }}
             centerTitle={activeProject?.name ?? ""}
             viewMode={activeViewMode ?? undefined}
             onViewModeChange={activeProjectId && activeViewMode ? ((mode) => void setProjectViewMode(mode)) : undefined}
@@ -1625,6 +1698,13 @@ export default function App() {
             isChatVisible={layout.isChatVisible}
             onToggleExplorer={() => setLayoutAndPersist((p) => ({ ...p, isExplorerVisible: !p.isExplorerVisible }))}
             onToggleChat={() => setLayoutAndPersist((p) => ({ ...p, isChatVisible: !p.isChatVisible }))}
+          />
+
+          <AlertModal
+            isOpen={alertMessage != null}
+            title={t("errors")}
+            message={alertMessage ?? ""}
+            onClose={() => setAlertMessage(null)}
           />
 
           <div className="flex min-h-0 w-full flex-1 overflow-hidden">

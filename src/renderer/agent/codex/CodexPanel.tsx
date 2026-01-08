@@ -506,7 +506,10 @@ export default function CodexPanel({ slot, projectRootPath, onOpenUrl, onOpenIma
   const closeHistory = useCallback(() => setIsHistoryOpen(false), []);
   const toggleHistory = useCallback(() => setIsHistoryOpen((v) => !v), []);
   const toggleDiffPanel = useCallback(() => setIsDiffPanelOpen((v) => !v), []);
-  const openSettings = useCallback(() => setIsSettingsOpen(true), []);
+  const openSettings = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("xcoding:dismissOverlays"));
+    setIsSettingsOpen(true);
+  }, []);
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -636,7 +639,7 @@ export default function CodexPanel({ slot, projectRootPath, onOpenUrl, onOpenIma
             }
           })();
         }}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={openSettings}
         attachments={attachments}
         onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((x) => x.id !== id))}
         onAddFileAttachment={async (file) => {

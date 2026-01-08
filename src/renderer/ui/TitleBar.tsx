@@ -203,6 +203,12 @@ export default function TitleBar({
     setLanguageMenuOpen(false);
   }, [currentLanguage]);
 
+  useEffect(() => {
+    const onDismissOverlays = () => setLanguageMenuOpen(false);
+    window.addEventListener("xcoding:dismissOverlays", onDismissOverlays as any);
+    return () => window.removeEventListener("xcoding:dismissOverlays", onDismissOverlays as any);
+  }, []);
+
   return (
     <div
       className="flex h-12 items-center justify-between bg-[var(--vscode-titleBar-activeBackground)] backdrop-blur-sm px-4 text-xs text-[var(--vscode-titleBar-activeForeground)] transition-colors duration-300"

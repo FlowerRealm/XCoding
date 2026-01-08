@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useI18n, type Language } from "./i18n";
+import { useUiTheme } from "./UiThemeContext";
 import type { ThemePackSummary } from "./theme/types";
 
 type Props = {
@@ -37,6 +38,7 @@ export default function IdeSettingsModal({
   onToggleChat
 }: Props) {
   const { t } = useI18n();
+  const { theme: uiTheme } = useUiTheme();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const languageOptions = useMemo(
@@ -123,7 +125,17 @@ export default function IdeSettingsModal({
                   onChange={(e) => onSetThemePackId(e.target.value)}
                   value={themePackId}
                 >
-                  {(themePacks.length ? themePacks : [{ id: themePackId, name: themePackId, appearance: "dark", source: "builtin" }]).map((t) => (
+                  {(themePacks.length
+                    ? themePacks
+                    : [
+                        {
+                          id: themePackId,
+                          name: themePackId,
+                          appearance: uiTheme,
+                          source: themePackId.startsWith("builtin-") ? "builtin" : "user"
+                        }
+                      ]
+                  ).map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
                     </option>
