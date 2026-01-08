@@ -1,6 +1,7 @@
 import { DiffEditor } from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
-import { ensureMonacoLanguage, MONACO_THEME_NAME, MONACO_URI_SCHEME } from "../monacoSetup";
+import { ensureMonacoLanguage, MONACO_URI_SCHEME } from "../monacoSetup";
+import { useUiTheme } from "./UiThemeContext";
 import { useI18n } from "./i18n";
 
 type ReviewFile = { path: string; added: number; removed: number; kind?: string; diff: string };
@@ -193,6 +194,7 @@ export default function CodexReviewDiffView({
   activePath?: string;
 }) {
   const { t } = useI18n();
+  const { monacoThemeName } = useUiTheme();
   const [selectedPath, setSelectedPath] = useState("");
   const [diffState, setDiffState] = useState<{
     loading: boolean;
@@ -308,15 +310,15 @@ export default function CodexReviewDiffView({
         </div>
       </div>
 
-      <div className="min-w-0 flex-1">
-        <div className="relative min-h-0 h-[calc(100%-2.25rem)]">
-        <DiffEditor
-            key={tabId}
-            theme={MONACO_THEME_NAME}
-            original={diffState.original}
-            modified={diffState.modified}
-            language={language}
-            originalModelPath={originalUri}
+	      <div className="min-w-0 flex-1">
+	        <div className="relative min-h-0 h-[calc(100%-2.25rem)]">
+	          <DiffEditor
+	            key={tabId}
+	            theme={monacoThemeName}
+	            original={diffState.original}
+	            modified={diffState.modified}
+	            language={language}
+	            originalModelPath={originalUri}
             modifiedModelPath={modifiedUri}
             keepCurrentOriginalModel={true}
             keepCurrentModifiedModel={true}

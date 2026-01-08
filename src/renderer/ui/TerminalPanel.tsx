@@ -697,18 +697,19 @@ export default function TerminalPanel({
         ) : (
           <div className="flex min-h-0 flex-1">
             <div className="min-h-0 flex-1 p-2">
-              <div className="grid h-full min-h-0 gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-                {viewTerminals.map((term, index) => {
-                  if (!term) return <div key={`empty-${index}`} className="h-full rounded border border-dashed border-[var(--vscode-panel-border)]" />;
-                  return (
-                    <div
-                      key={term.id}
-                      className={[
-                        "relative min-h-0 overflow-hidden bg-glass-bg-heavy rounded-md border border-glass-border",
-                        isActiveView ? "ring-1 ring-brand-primary/50" : ""
-                      ].join(" ")}
-                      onMouseDown={() => setFocusedView(index)}
-                    >
+	              <div className="grid h-full min-h-0 gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+	                {viewTerminals.map((term, index) => {
+	                  if (!term) return <div key={`empty-${index}`} className="h-full rounded border border-dashed border-[var(--vscode-panel-border)]" />;
+	                  const isFocusedView = index === state.focusedView;
+	                  return (
+	                    <div
+	                      key={term.id}
+	                      className={[
+	                        "relative min-h-0 overflow-hidden bg-glass-bg-heavy rounded-md border border-glass-border",
+	                        isFocusedView ? "ring-1 ring-brand-primary/50" : ""
+	                      ].join(" ")}
+	                      onMouseDown={() => setFocusedView(index)}
+	                    >
                       <TerminalView
                         tabId={term.id}
                         sessionId={term.sessionId}
