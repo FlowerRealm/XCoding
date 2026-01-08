@@ -2,6 +2,7 @@ import type { AppSettings } from "../stores/settingsStore";
 import { getProjectForSlot } from "../stores/projectsStore";
 import { sendToProjectService } from "../managers/projectServiceManager";
 import { registerAiIpc } from "./aiIpc";
+import { registerClaudeIpc } from "./claudeIpc";
 import { registerCodexIpc } from "./codexIpc";
 import { registerPreviewIpc } from "./previewIpc";
 import { registerProjectIpc } from "./projectIpc";
@@ -30,6 +31,7 @@ export function setupIpc({
   registerProjectIpc();
 
   registerAiIpc({ getProjectForSlot, sendToProjectService });
+  registerClaudeIpc();
   registerCodexIpc();
   registerTerminalIpc({ getProjectForSlot });
   registerPreviewIpc();
