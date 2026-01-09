@@ -26,13 +26,13 @@ const hasNonStringEn = hasNonStringValues(enUS as any);
 const hasNonStringZh = hasNonStringValues(zhCN as any);
 
 const issues: string[] = [];
-if (missingInZh.length) issues.push(`zh-CN 缺少 ${missingInZh.length} 个 key`);
-if (missingInEn.length) issues.push(`en-US 缺少 ${missingInEn.length} 个 key`);
-if (hasNonStringEn) issues.push("en-US 存在非 string 的 value");
-if (hasNonStringZh) issues.push("zh-CN 存在非 string 的 value");
+if (missingInZh.length) issues.push(`zh-CN is missing ${missingInZh.length} keys`);
+if (missingInEn.length) issues.push(`en-US is missing ${missingInEn.length} keys`);
+if (hasNonStringEn) issues.push("en-US contains non-string values");
+if (hasNonStringZh) issues.push("zh-CN contains non-string values");
 
 if (issues.length === 0) {
-  console.log("[i18n] OK: en-US 与 zh-CN keys 一致。");
+  console.log("[i18n] OK: en-US and zh-CN keys match.");
   process.exit(0);
 }
 
@@ -47,4 +47,3 @@ if (missingInEn.length) {
 }
 
 process.exit(shouldFail ? 1 : 0);
-

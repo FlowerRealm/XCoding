@@ -6,6 +6,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
 import * as yauzl from "yauzl";
+import { DEFAULT_THEME_PACK_ID, OPTIONAL_THEME_PACK_ID } from "../../shared/themePacks";
 
 export type ThemeAppearance = "dark" | "light";
 
@@ -42,13 +43,12 @@ export type ResolvedThemePack = {
   extraCssText?: string;
 };
 
-const BUILTIN_THEME_PACKS: ThemePackSummary[] = [
-  { id: "builtin-dark", name: "XCoding Dark", appearance: "dark", source: "builtin" },
-  { id: "builtin-light", name: "XCoding Light", appearance: "light", source: "builtin" }
-];
+const DEFAULT_THEME_ID = DEFAULT_THEME_PACK_ID;
+const OPTIONAL_THEME_ID = OPTIONAL_THEME_PACK_ID;
+const THEMES_INIT_MARKER = ".xcoding-themes-initialized";
 
+const MONACO_BUILTIN_CLASSIC_DARK = "xcoding-classic-dark";
 const MONACO_BUILTIN_DARK = "xcoding-dark";
-const MONACO_BUILTIN_LIGHT = "xcoding-light";
 
 type ThemeJson = {
   name?: unknown;
@@ -83,9 +83,150 @@ export function ensureThemesRoot() {
   } catch {
     // ignore
   }
+  ensureDefaultThemePackExists();
+  ensureStarterThemePacksOnce();
+}
+
+function ensureDefaultThemePackExists() {
+  if (!isSafeThemeDirName(DEFAULT_THEME_ID)) return;
+  const root = themesRootPath();
+  const dir = resolveWithinDir(root, DEFAULT_THEME_ID);
+  if (!dir) return;
+
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    // ignore
+  }
+
+  const themeJsonPath = path.join(dir, "theme.json");
+  if (!safeStat(themeJsonPath)) {
+    try {
+      fs.writeFileSync(
+        themeJsonPath,
+        JSON.stringify(
+          {
+            name: "XCoding Classic",
+            type: "dark",
+            css: "theme.css",
+            cssVars: {},
+            colors: {}
+          },
+          null,
+          2
+        ),
+        "utf8"
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  const themeCssPath = path.join(dir, "theme.css");
+  if (!safeStat(themeCssPath)) {
+    try {
+      fs.writeFileSync(
+        themeCssPath,
+        [
+          "/*",
+          "  Default theme pack (protected): this folder is re-created automatically if missing.",
+          "  You can add overrides here (CSS variables, @font-face, etc.).",
+          "*/",
+          "",
+          ":root {",
+          "  /* Example:",
+          "  --vscode-editor-background: #1e1e1e;",
+          "  */",
+          "}"
+        ].join("\n"),
+        "utf8"
+      );
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function ensureStarterThemePacksOnce() {
+  const root = themesRootPath();
+  const markerPath = path.join(root, THEMES_INIT_MARKER);
+  if (safeStat(markerPath)) return;
+
+  try {
+    ensureStarterThemePack({
+      id: OPTIONAL_THEME_ID,
+      themeJson: JSON.stringify(
+        {
+          name: "XCoding Aurora Dark",
+          type: "dark",
+          css: "theme.css",
+          cssVars: {},
+          colors: {}
+        },
+        null,
+        2
+      ),
+      themeCss: [
+        "/*",
+        "  Editable starter theme pack.",
+        "  - Edit theme.json for VS Code-style colors/tokenColors (mapped to --vscode-* CSS vars).",
+        "  - Edit this file for extra CSS variables / @font-face / fine-grained overrides.",
+        "*/",
+        "",
+        ":root {",
+        "  /* Example overrides:",
+        "  --aurora-bg: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.18) 0%, transparent 55%);",
+        "  */",
+        "}"
+      ].join("\n")
+    });
+  } finally {
+    try {
+      fs.writeFileSync(markerPath, JSON.stringify({ version: 2, createdAt: Date.now() }, null, 2), "utf8");
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function ensureStarterThemePack({ id, themeJson, themeCss }: { id: string; themeJson: string; themeCss: string }) {
+  if (!id || !isSafeThemeDirName(id)) return;
+  if (id === DEFAULT_THEME_ID) return;
+
+  const root = themesRootPath();
+  const dir = resolveWithinDir(root, id);
+  if (!dir) return;
+
+  // Only create the starter pack on first initialization; user may later delete/replace it.
+  if (safeStat(dir)) return;
+
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "theme.json"), themeJson, "utf8");
+    fs.writeFileSync(path.join(dir, "theme.css"), themeCss, "utf8");
+  } catch {
+    // ignore
+  }
+}
+
+export function resolveThemePackDirPath(themePackId: string): string | null {
+  const requested = String(themePackId ?? "").trim();
+  if (!requested || requested === DEFAULT_THEME_ID) return null;
+  if (!isSafeThemeDirName(requested)) return null;
+  const root = themesRootPath();
+  return resolveWithinDir(root, requested);
 }
 
 export function listThemePacks(): ThemePackSummary[] {
+  ensureThemesRoot();
+
+  const builtinClassic: ThemePackSummary = (() => {
+    const root = themesRootPath();
+    const parsed = readThemeJson(path.join(root, DEFAULT_THEME_ID, "theme.json"));
+    const name = typeof parsed?.name === "string" && parsed.name.trim() ? parsed.name.trim() : DEFAULT_THEME_ID;
+    return { id: DEFAULT_THEME_ID, name, appearance: "dark", source: "builtin" };
+  })();
+
   const userThemes: ThemePackSummary[] = [];
   try {
     const root = themesRootPath();
@@ -93,6 +234,8 @@ export function listThemePacks(): ThemePackSummary[] {
     for (const ent of entries) {
       if (!ent.isDirectory()) continue;
       const id = ent.name;
+      if (id === DEFAULT_THEME_ID) continue;
+      if (id.startsWith(".tmp-import-")) continue;
       const themePath = path.join(root, id, "theme.json");
       const parsed = readThemeJson(themePath);
       if (!parsed) continue;
@@ -106,31 +249,21 @@ export function listThemePacks(): ThemePackSummary[] {
   }
 
   userThemes.sort((a, b) => a.name.localeCompare(b.name));
-  return [...BUILTIN_THEME_PACKS, ...userThemes];
+  return [builtinClassic, ...userThemes];
 }
 
 export function resolveThemePack(themePackId: string): ResolvedThemePack {
-  const requested = String(themePackId ?? "").trim();
-  const builtin = BUILTIN_THEME_PACKS.find((t) => t.id === requested);
-  if (builtin) {
-    return {
-      id: builtin.id,
-      name: builtin.name,
-      appearance: builtin.appearance,
-      cssVars: {},
-      monacoThemeName: builtin.appearance === "light" ? MONACO_BUILTIN_LIGHT : MONACO_BUILTIN_DARK,
-      extraCssText: ""
-    };
-  }
+  ensureThemesRoot();
 
-  if (!isSafeThemeDirName(requested)) return resolveThemePack("builtin-dark");
+  const requested = String(themePackId ?? "").trim();
+  const id = requested || DEFAULT_THEME_ID;
+  if (!isSafeThemeDirName(id)) return resolveThemePack(DEFAULT_THEME_ID);
 
   const root = themesRootPath();
-  const id = requested || "builtin-dark";
   const themeJsonPath = resolveWithinDir(root, path.join(id, "theme.json"));
-  if (!themeJsonPath) return resolveThemePack("builtin-dark");
+  if (!themeJsonPath) return resolveThemePack(DEFAULT_THEME_ID);
   const stat = safeStat(themeJsonPath);
-  if (!stat) return resolveThemePack("builtin-dark");
+  if (!stat) return resolveThemePack(DEFAULT_THEME_ID);
 
   const themeDir = path.dirname(themeJsonPath);
   const cached = cacheById.get(id);
@@ -143,9 +276,9 @@ export function resolveThemePack(themePackId: string): ResolvedThemePack {
   }
 
   const parsed = readThemeJson(themeJsonPath);
-  if (!parsed) return resolveThemePack("builtin-dark");
+  if (!parsed) return resolveThemePack(DEFAULT_THEME_ID);
 
-  const appearance = getThemeAppearance(parsed);
+  const appearance: ThemeAppearance = id === DEFAULT_THEME_ID ? "dark" : getThemeAppearance(parsed);
   const name = typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : id;
 
   const cssVars: Record<string, string> = {};
@@ -178,8 +311,15 @@ export function resolveThemePack(themePackId: string): ResolvedThemePack {
 
   const extraCssText = cssRelPath ? readThemeCss(themeDir, cssRelPath) : "";
 
-  const monacoThemeName = `xcoding-pack-${sanitizeThemeId(id)}`;
-  const monacoThemeData = buildMonacoThemeData({ appearance, colors, tokenColors: parsed.tokenColors });
+  let monacoThemeName = `xcoding-pack-${sanitizeThemeId(id)}`;
+  let monacoThemeData: MonacoThemeData | undefined = buildMonacoThemeData({ appearance, colors, tokenColors: parsed.tokenColors });
+  if (id === DEFAULT_THEME_ID) {
+    monacoThemeName = MONACO_BUILTIN_CLASSIC_DARK;
+    monacoThemeData = undefined;
+  } else if (id === OPTIONAL_THEME_ID) {
+    monacoThemeName = MONACO_BUILTIN_DARK;
+    monacoThemeData = undefined;
+  }
 
   const resolved: ResolvedThemePack = {
     id,
@@ -211,7 +351,7 @@ export async function importThemePackFromZip(
   if (!meta) return { ok: false, reason: "theme_json_not_found" };
 
   const themeId = meta.themeId;
-  if (!themeId || !isSafeThemeDirName(themeId) || themeId === "builtin-dark" || themeId === "builtin-light") {
+  if (!themeId || !isSafeThemeDirName(themeId) || themeId === DEFAULT_THEME_ID) {
     return { ok: false, reason: "invalid_theme_id", themeId };
   }
 

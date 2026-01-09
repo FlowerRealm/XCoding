@@ -19,7 +19,6 @@
     "start": "electron .",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:codex-rpc": "tsx scripts/test-codex-jsonrpc.ts",
     "i18n:scan": "tsx scripts/i18n-scan.ts",
     "i18n:scan:fail": "tsx scripts/i18n-scan.ts --fail",
     "dist": "pnpm build && electron-builder --publish never",

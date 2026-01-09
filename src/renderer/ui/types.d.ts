@@ -421,6 +421,7 @@ declare global {
           extraCssText?: string;
         }>;
         openDir: () => Promise<{ ok: boolean; path: string }>;
+        openThemeDir: (id: string) => Promise<{ ok: boolean; path: string }>;
         importZip: () => Promise<
           | { ok: true; canceled: true }
           | { ok: true; themeId: string; didReplace: boolean }

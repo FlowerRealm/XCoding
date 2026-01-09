@@ -92,9 +92,11 @@ themes/<themeId>/
 
 ## 3. 内置主题
 
-应用内置两个主题包（无需在 `themes/` 目录中存在）：
-- `builtin-dark`
-- `builtin-light`
+应用内置一个默认主题包（不可删除；如目录缺失会自动重建）：
+- `builtin-classic`（默认）
+
+另外，应用会在首次初始化主题目录时写入一个“可编辑”的候补主题包（位于 `themes/` 目录内，可自行修改/删除）：
+- `builtin-dark`（Aurora Dark）
 
 ---
 
@@ -121,4 +123,4 @@ themes/<themeId>/
    - UI 配色即时变化
    - Monaco 编辑器主题即时变化
    - Terminal 颜色即时变化
-4. 删除该主题目录后重启/重新打开设置，应用应自动回退到 `builtin-dark`/`builtin-light`（不应白屏）
+4. 删除该主题目录后重启/重新打开设置，应用应自动回退到 `builtin-classic`（不应白屏）

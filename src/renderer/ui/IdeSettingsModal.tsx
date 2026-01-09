@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useI18n, type Language } from "./i18n";
+import { messages, useI18n, type Language } from "./i18n";
 import { useUiTheme } from "./UiThemeContext";
 import type { ThemePackSummary } from "./theme/types";
 
@@ -15,11 +15,6 @@ type Props = {
   onSetThemePackId: (id: string) => void;
   onOpenThemesDir: () => void;
   onImportThemePack: () => void;
-
-  isExplorerVisible: boolean;
-  isChatVisible: boolean;
-  onToggleExplorer: () => void;
-  onToggleChat: () => void;
 };
 
 export default function IdeSettingsModal({
@@ -31,22 +26,26 @@ export default function IdeSettingsModal({
   themePacks,
   onSetThemePackId,
   onOpenThemesDir,
-  onImportThemePack,
-  isExplorerVisible,
-  isChatVisible,
-  onToggleExplorer,
-  onToggleChat
+  onImportThemePack
 }: Props) {
   const { t } = useI18n();
   const { theme: uiTheme } = useUiTheme();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const languageOptions = useMemo(
-    () =>
-      [
-        { value: "en-US" as const, label: t("languageEnglish") },
-        { value: "zh-CN" as const, label: t("languageChinese") }
-      ] satisfies Array<{ value: Language; label: string }>,
+    () => {
+      const knownLabel = (lang: Language) => {
+        if (lang === "en-US") return t("languageEnglish");
+        if (lang === "zh-CN") return t("languageChinese");
+        return "";
+      };
+      const codes = (Object.keys(messages) as Language[]).slice().sort((a, b) => a.localeCompare(b));
+      return codes.map((value) => {
+        const label = knownLabel(value) || value;
+        const display = label === value ? label : `${label} (${value})`;
+        return { value, label: display };
+      });
+    },
     [t]
   );
 
@@ -68,7 +67,7 @@ export default function IdeSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 p-6 md:p-10"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6 md:p-10"
       onMouseDown={onClose}
       role="dialog"
       aria-modal="true"
@@ -95,26 +94,17 @@ export default function IdeSettingsModal({
           <div className="grid gap-6">
             <div>
               <div className="mb-2 text-sm font-semibold text-[var(--vscode-foreground)]">{t("language")}</div>
-              <div className="inline-flex overflow-hidden rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
-                {languageOptions.map((opt) => {
-                  const active = opt.value === language;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={[
-                        "px-3 py-2 text-sm",
-                        active
-                          ? "bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)]"
-                          : "text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
-                      ].join(" ")}
-                      onClick={() => onSetLanguage(opt.value)}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <select
+                className="min-w-[220px] rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] px-3 py-2 text-sm text-[var(--vscode-foreground)] outline-none focus:border-[var(--vscode-focusBorder)]"
+                onChange={(e) => onSetLanguage(e.target.value as Language)}
+                value={language}
+              >
+                {languageOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -157,20 +147,6 @@ export default function IdeSettingsModal({
                 >
                   {t("openThemesFolder")}
                 </button>
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 text-sm font-semibold text-[var(--vscode-foreground)]">{t("panels")}</div>
-              <div className="grid gap-2">
-                <label className="flex items-center gap-2 text-sm text-[var(--vscode-foreground)]">
-                  <input checked={isExplorerVisible} className="h-3 w-3" onChange={onToggleExplorer} type="checkbox" />
-                  {t("explorer")}
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[var(--vscode-foreground)]">
-                  <input checked={isChatVisible} className="h-3 w-3" onChange={onToggleChat} type="checkbox" />
-                  {t("chat")}
-                </label>
               </div>
             </div>
           </div>

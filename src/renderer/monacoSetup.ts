@@ -3,6 +3,7 @@ import * as monaco from "monaco-editor";
 
 export const MONACO_DARK_THEME_NAME = "xcoding-dark";
 export const MONACO_LIGHT_THEME_NAME = "xcoding-light";
+export const MONACO_CLASSIC_DARK_THEME_NAME = "xcoding-classic-dark";
 export const MONACO_URI_SCHEME = "xcoding";
 
 export function getMonacoThemeName(theme: "dark" | "light") {
@@ -102,6 +103,32 @@ export function ensureMonacoLanguage(languageId: string) {
 }
 
 // Define a Monaco theme aligned with our VS Code-like CSS tokens in `src/renderer/styles.css`.
+monaco.editor.defineTheme(MONACO_CLASSIC_DARK_THEME_NAME, {
+  base: "vs-dark",
+  inherit: true,
+  rules: [
+    { token: "diff.add", foreground: "89d185", background: "0f2a12" },
+    { token: "diff.delete", foreground: "f14c4c", background: "2a0f0f" },
+    { token: "diff.hunkHeader", foreground: "4fc1ff", fontStyle: "bold" },
+    { token: "diff.fileHeader", foreground: "569cd6", fontStyle: "bold" },
+    { token: "diff.patchHeader", foreground: "c586c0", fontStyle: "bold" },
+    { token: "diff.comment", foreground: "6a9955", fontStyle: "italic" },
+    { token: "diff.meta", foreground: "9d9d9d", fontStyle: "italic" },
+    { token: "diff.context", foreground: "cccccc" }
+  ],
+  colors: {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#cccccc",
+    "editorCursor.foreground": "#cccccc",
+    "editorLineNumber.foreground": "#9d9d9d",
+    "editorLineNumber.activeForeground": "#cccccc",
+    "editor.selectionBackground": "#094771",
+    "editor.lineHighlightBackground": "#2a2a2a",
+    "editorIndentGuide.background": "#2a2a2a",
+    "editorIndentGuide.activeBackground": "#3c3c3c"
+  }
+});
+
 monaco.editor.defineTheme(MONACO_DARK_THEME_NAME, {
   base: "vs-dark",
   inherit: true,
@@ -150,7 +177,7 @@ monaco.editor.defineTheme(MONACO_LIGHT_THEME_NAME, {
 });
 
 try {
-  monaco.editor.setTheme(MONACO_DARK_THEME_NAME);
+  monaco.editor.setTheme(MONACO_CLASSIC_DARK_THEME_NAME);
 } catch {
   // ignore
 }

@@ -206,6 +206,7 @@ contextBridge.exposeInMainWorld("xcoding", {
     list: () => ipcRenderer.invoke("themes:list"),
     getResolved: (id) => ipcRenderer.invoke("themes:getResolved", { id }),
     openDir: () => ipcRenderer.invoke("themes:openDir"),
+    openThemeDir: (id) => ipcRenderer.invoke("themes:openThemeDir", { id }),
     importZip: () => ipcRenderer.invoke("themes:importZip")
   },
   os: {

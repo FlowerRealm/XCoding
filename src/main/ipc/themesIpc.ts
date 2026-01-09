@@ -1,7 +1,14 @@
 // 主题 IPC：向渲染进程提供主题包列表与解析后的主题数据，并提供打开主题目录的入口。
 import { dialog, ipcMain, shell } from "electron";
 import { getWindowFromEvent } from "../app/windowManager";
-import { ensureThemesRoot, importThemePackFromZip, listThemePacks, resolveThemePack, themesRootPath } from "../managers/themeManager";
+import {
+  ensureThemesRoot,
+  importThemePackFromZip,
+  listThemePacks,
+  resolveThemePack,
+  resolveThemePackDirPath,
+  themesRootPath
+} from "../managers/themeManager";
 
 export function registerThemesIpc() {
   ipcMain.handle("themes:list", () => {
@@ -19,6 +26,19 @@ export function registerThemesIpc() {
     const p = themesRootPath();
     await shell.openPath(p);
     return { ok: true, path: p };
+  });
+
+  ipcMain.handle("themes:openThemeDir", async (_event, { id }: { id: string }) => {
+    ensureThemesRoot();
+    const root = themesRootPath();
+    const dir = resolveThemePackDirPath(id);
+    const target = dir || root;
+    const err = await shell.openPath(target);
+    if (err && target !== root) {
+      await shell.openPath(root);
+      return { ok: true, path: root };
+    }
+    return { ok: true, path: target };
   });
 
   ipcMain.handle("themes:importZip", async (event) => {

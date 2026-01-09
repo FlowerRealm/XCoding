@@ -18,7 +18,6 @@ export function registerSettingsIpc({
 
   ipcMain.handle("settings:setTheme", (_event, { theme }: { theme: AppSettings["ui"]["theme"] }) => {
     settings.ui.theme = theme;
-    settings.ui.themePackId = theme === "light" ? "builtin-light" : "builtin-dark";
     persistSettingsToDisk();
     return { ok: true };
   });

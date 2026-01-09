@@ -15,9 +15,10 @@ import AlertModal from "./AlertModal";
 import IdeSettingsModal from "./IdeSettingsModal";
 import type { TerminalPanelState } from "./TerminalPanel";
 import TitleBar from "./TitleBar";
-import { getMonacoThemeName } from "../monacoSetup";
+import { MONACO_CLASSIC_DARK_THEME_NAME } from "../monacoSetup";
 import { applyResolvedThemePack } from "./theme/applyTheme";
 import type { ResolvedThemePack, ThemePackSummary } from "./theme/types";
+import { DEFAULT_THEME_PACK_ID } from "../../shared/themePacks";
 import {
   getSlotProjectId,
   makeEmptySlotUiState,
@@ -48,14 +49,14 @@ function normalizeRelPath(input: string) {
   return String(input ?? "").trim().replace(/^([/\\\\])+/, "").replace(/[\\\\]+/g, "/");
 }
 
-function makeBuiltinResolvedThemePack(appearance: UiTheme): ResolvedThemePack {
-  const id = appearance === "light" ? "builtin-light" : "builtin-dark";
+function makeFallbackResolvedThemePack(): ResolvedThemePack {
+  const id = DEFAULT_THEME_PACK_ID;
   return {
     id,
     name: id,
-    appearance,
+    appearance: "dark",
     cssVars: {},
-    monacoThemeName: getMonacoThemeName(appearance),
+    monacoThemeName: MONACO_CLASSIC_DARK_THEME_NAME,
     extraCssText: ""
   };
 }
@@ -63,13 +64,13 @@ function makeBuiltinResolvedThemePack(appearance: UiTheme): ResolvedThemePack {
 export default function App() {
   const [language, setLanguage] = useState<Language>("en-US");
   const [theme, setTheme] = useState<UiTheme>("dark");
-  const [themePackId, setThemePackId] = useState("builtin-dark");
+  const [themePackId, setThemePackId] = useState(DEFAULT_THEME_PACK_ID);
   const [themePacks, setThemePacks] = useState<ThemePackSummary[]>([]);
-  const [monacoThemeName, setMonacoThemeName] = useState("xcoding-dark");
+  const [monacoThemeName, setMonacoThemeName] = useState(MONACO_CLASSIC_DARK_THEME_NAME);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const themeApplySeqRef = useRef(0);
   const themePackIdRef = useRef(themePackId);
-  const lastSuccessfulResolvedThemePackRef = useRef<ResolvedThemePack>(makeBuiltinResolvedThemePack("dark"));
+  const lastSuccessfulResolvedThemePackRef = useRef<ResolvedThemePack>(makeFallbackResolvedThemePack());
   const themePackPersistTimerRef = useRef<number | null>(null);
   const pendingThemePackPersistIdRef = useRef<string | null>(null);
   const [activeProjectSlot, setActiveProjectSlot] = useState<number>(() => {
@@ -278,6 +279,22 @@ export default function App() {
     document.body.classList.toggle("xcoding-tab-dragging", isDraggingTab);
     return () => document.body.classList.remove("xcoding-tab-dragging");
   }, [isDraggingTab]);
+
+  useEffect(() => {
+    if (!isIdeSettingsOpen) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const packs = await window.xcoding.themes.list();
+        if (!cancelled) setThemePacks(packs);
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("themes.list failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isIdeSettingsOpen]);
 
   useEffect(() => {
     const onEnd = () => setIsDraggingTab(false);
@@ -1351,8 +1368,7 @@ export default function App() {
         setLayout(s.ui.layout);
       }
 
-      const fallbackTheme: UiTheme = s.ui.theme === "light" ? "light" : "dark";
-      const fallbackId = fallbackTheme === "light" ? "builtin-light" : "builtin-dark";
+      const fallbackId = DEFAULT_THEME_PACK_ID;
       const requestedId =
         typeof s.ui.themePackId === "string" && s.ui.themePackId.trim() ? s.ui.themePackId.trim() : fallbackId;
 
@@ -1378,7 +1394,7 @@ export default function App() {
         if (cancelled || applySeq !== themeApplySeqRef.current) return;
         if (import.meta.env.DEV) console.warn("themes.getResolved failed", e);
         showAlert(t("themePackLoadFailedFallback"));
-        applyResolvedThemeToState(makeBuiltinResolvedThemePack(fallbackTheme));
+        applyResolvedThemeToState(makeFallbackResolvedThemePack());
         if (fallbackId !== requestedId) schedulePersistThemePackId(fallbackId);
       }
     })();
@@ -1718,10 +1734,6 @@ export default function App() {
             onSetThemePackId={(next) => void setThemePackAndPersist(next)}
             onOpenThemesDir={() => void openThemesDir()}
             onImportThemePack={() => void importThemePackZip()}
-            isExplorerVisible={layout.isExplorerVisible}
-            isChatVisible={layout.isChatVisible}
-            onToggleExplorer={() => setLayoutAndPersist((p) => ({ ...p, isExplorerVisible: !p.isExplorerVisible }))}
-            onToggleChat={() => setLayoutAndPersist((p) => ({ ...p, isChatVisible: !p.isChatVisible }))}
           />
 
           <AlertModal
@@ -1874,7 +1886,7 @@ export default function App() {
 
                   <div
 
-                    className="w-0 cursor-col-resize hover:bg-brand-primary/50"
+                    className="relative z-10 w-0 shrink-0 cursor-col-resize before:absolute before:inset-y-0 before:-left-1 before:w-2 before:content-[''] before:bg-transparent before:transition-colors hover:before:bg-brand-primary/50"
 
                     onMouseDown={(e) => startResize("explorer", e)}
 
@@ -1937,7 +1949,7 @@ export default function App() {
 
                 {effectiveLayout.isChatVisible ? (
                   <div
-                    className="w-0 cursor-col-resize hover:bg-brand-primary/50 transition-colors z-10"
+                    className="relative z-10 w-0 shrink-0 cursor-col-resize before:absolute before:inset-y-0 before:-left-1 before:w-2 before:content-[''] before:bg-transparent before:transition-colors hover:before:bg-brand-primary/50"
                     onMouseDown={(e) => startResize("chat", e)}
                     role="separator"
                     aria-orientation="vertical"

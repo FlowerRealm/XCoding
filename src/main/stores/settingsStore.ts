@@ -1,6 +1,7 @@
 import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { DEFAULT_THEME_PACK_ID } from "../../shared/themePacks";
 
 export type AppSettings = {
   ui: {
@@ -24,7 +25,7 @@ export const settings: AppSettings = {
   ui: {
     language: "en-US",
     theme: "dark",
-    themePackId: "builtin-dark",
+    themePackId: DEFAULT_THEME_PACK_ID,
     layout: { explorerWidth: 180, chatWidth: 530, isExplorerVisible: true, isChatVisible: true }
   },
   ai: {
@@ -50,7 +51,8 @@ export function loadSettingsFromDisk() {
     if (typeof parsed.ui?.themePackId === "string" && parsed.ui.themePackId.trim()) {
       settings.ui.themePackId = parsed.ui.themePackId.trim();
     } else if (parsed.ui?.theme === "dark" || parsed.ui?.theme === "light") {
-      settings.ui.themePackId = parsed.ui.theme === "light" ? "builtin-light" : "builtin-dark";
+      settings.ui.theme = "dark";
+      settings.ui.themePackId = DEFAULT_THEME_PACK_ID;
       didMigrateThemePack = true;
     }
     let didMigrateLayout = false;
