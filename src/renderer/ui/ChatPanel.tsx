@@ -218,7 +218,7 @@ export default function ChatPanel({
             projectRootPath={projectRootPath}
             onOpenUrl={onOpenUrl}
             onOpenImage={onOpenImage}
-            isActive={safeAgentView === "codex"}
+            isActive={safeAgentView === "codex" && isVisible}
           />
         </div>
 
